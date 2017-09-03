@@ -16,6 +16,9 @@ interface AppState {
 }
 
 class App extends React.Component <{}, AppState> {
+  inputAgents: HTMLInputElement | null;
+  buttonPlay: HTMLButtonElement | null;
+
   constructor () {
     super();
     
@@ -69,41 +72,39 @@ class App extends React.Component <{}, AppState> {
   }
 
   onStartPauseClicked() {
-    let btn = (this.refs['btn-play'] as HTMLButtonElement);
+    if (!this.buttonPlay || !this.inputAgents) { return; }
+    let button = this.buttonPlay;
 
-    if (btn.innerText === 'Play') {
-      btn.innerText = 'Pause';
+    if (button.innerText === 'Play') {
+      button.innerText = 'Pause';
 
       if (this.state.agents.length <= 0) {
-        let count = +(this.refs['agent-count'] as HTMLInputElement).value;
-        let agents = this.initAgents(count);
+        let agents = this.initAgents(+this.inputAgents.value);
         this.setState({agents: agents});
       }
   
       _intervalID = window.setInterval(this.act.bind(this), _waitInterval);
     } else {
-      btn.innerText = 'Play';
+      button.innerText = 'Play';
       window.clearInterval(_intervalID);
     }
   }
 
   onRefreshClicked() {
-    let btn = (this.refs['btn-play'] as HTMLButtonElement);
-    let count = +(this.refs['agent-count'] as HTMLInputElement).value;
-    let agents = this.initAgents(count);
-
+    if (!this.inputAgents || !this.buttonPlay) { return; }
+    let agents = this.initAgents(+this.inputAgents.value);
     window.clearInterval(_intervalID);
-    btn.innerText = 'Play';
+    this.buttonPlay.innerText = 'Play';
     this.setState({
       agents: agents
     });
   }
 
   onIntervalChanged(e: React.ChangeEvent<HTMLInputElement>) {
-    let btn = (this.refs['btn-play'] as HTMLButtonElement);
+    if (!this.buttonPlay) { return; }
     _waitInterval = +(e.target as HTMLInputElement).value;
 
-    if (btn.innerText === 'Pause') {
+    if (this.buttonPlay.innerText === 'Pause') {
       window.clearInterval(_intervalID);
       _intervalID = window.setInterval(this.act.bind(this), _waitInterval);
     }
@@ -133,9 +134,9 @@ class App extends React.Component <{}, AppState> {
             <div className="col-lg-3">
               <div className="input-group">
                 <span className="input-group-addon">Agents</span>
-                <input ref="agent-count" type="number" className="form-control" defaultValue="100" />
+                <input ref={i => this.inputAgents = i} type="number" className="form-control" defaultValue="100" />
                 <span className="input-group-btn">
-                  <button ref="btn-refresh" type="button" className="btn btn-secondary" onClick={this.onRefreshClicked.bind(this)}>
+                  <button type="button" className="btn btn-secondary" onClick={this.onRefreshClicked.bind(this)}>
                     Refresh
                   </button>
                 </span>
@@ -156,7 +157,7 @@ class App extends React.Component <{}, AppState> {
             <div className="col-lg-2">
               <div className="input-group">
                 <span className="input-group-addon">Wait</span>
-                <input ref="wait-interval" type="number" className="form-control" min="20" max="1000" step="5" defaultValue={_waitInterval + ''} onChange={this.onIntervalChanged.bind(this)} />
+                <input type="number" className="form-control" min="20" max="1000" step="5" defaultValue={_waitInterval + ''} onChange={this.onIntervalChanged.bind(this)} />
               </div>
             </div>
             <div className="col-lg-2">
@@ -167,7 +168,7 @@ class App extends React.Component <{}, AppState> {
             </div>
             <div className="col-lg-1">
               <div className="btn-group" role="group" aria-label="Basic example">
-                <button ref="btn-play" type="button" className="btn btn-info" onClick={this.onStartPauseClicked.bind(this)}>
+                <button ref={b => this.buttonPlay = b} type="button" className="btn btn-info" onClick={this.onStartPauseClicked.bind(this)}>
                   Play
                 </button>
                 
@@ -233,7 +234,8 @@ class Agent {
         || minxy.y < 0
         || maxxy.y > _height
       ) {
-        return;
+        angle += 0.5;
+        if (angle > 1) { angle -+ 1; }
       }
 
       for (var i = 0; i < this.bodies.length; i++) {
@@ -268,7 +270,6 @@ class Agent {
   }
 
   isSticky(): boolean {
-    console.log('Sticky!');
     this.stickWait++;
     let stick = this.stickWait >= (1 / _stickyness);
     if (stick) { this.stickWait = 0; }
