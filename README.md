@@ -1,4 +1,4 @@
-A particle self assembly simulator. Visit [here](https://eliovr.github.io/selfassembly/) to try it.
+A particle self assembly simulator with diffusion+limited aggregation. Visit [here](https://eliovr.github.io/selfassembly/) to try it.
 
 ## Details
 The project was build using: 
@@ -15,4 +15,4 @@ npm install
 npm start
 ```
 
-This project was build in collaboration with Carlos Rodriguez-Abreu.
+This project was built in collaboration with Carlos Rodriguez-Abreu.

@@ -15,13 +15,13 @@ interface AppState {
   agents: Array<Agent>;
 }
 
-class App extends React.Component <{}, AppState> {
+class App extends React.Component<{}, AppState> {
   inputAgents: HTMLInputElement | null;
   buttonPlay: HTMLButtonElement | null;
 
-  constructor () {
+  constructor() {
     super();
-    
+
     this.state = {
       agents: []
     };
@@ -31,16 +31,16 @@ class App extends React.Component <{}, AppState> {
     let agents: Array<Agent> = [];
     let diameter = (_radius * 2);
 
-    for (let i = 0; i < agentCount ; i++) {
+    for (let i = 0; i < agentCount; i++) {
       let x = Math.random() * _width + diameter;
       let y = Math.random() * _height + diameter;
-      
+
       x = x > _width ? x - (diameter * 2) : x;
       y = y > _height ? y - (diameter * 2) : y;
 
       agents.push(new Agent(new Point(x, y)));
     }
-    
+
     return agents;
   }
 
@@ -50,25 +50,22 @@ class App extends React.Component <{}, AppState> {
 
     for (let i = 0; i < agents.length; i++) {
       let a = agents[i];
-      
+
       if (!a.isEmpty()) {
         a.act();
-
-        for (let j = 0; j < agents.length; j++) {
-          let b = agents[j];
-          if (a.id !== b.id && a.collides(b)) {
-            if (Math.random() < _stickyness) { 
-              b.migrateTo(a);
-            }
-            break;
-          }
-        }
-        
         newAgents.push(a);
+
+        // if (Math.random() < _stickyness) {
+          for (let j = 0; j < agents.length; j++) {
+            let b = agents[j];
+            if (a.id !== b.id && a.collides(b)) {
+              b.migrateTo(a);
+              break;
+            }
+          }
+        // }
       }
     }
-    
-    this.setState({agents: newAgents});
   }
 
   onStartPauseClicked() {
@@ -80,9 +77,9 @@ class App extends React.Component <{}, AppState> {
 
       if (this.state.agents.length <= 0) {
         let agents = this.initAgents(+this.inputAgents.value);
-        this.setState({agents: agents});
+        this.setState({ agents: agents });
       }
-  
+
       _intervalID = window.setInterval(this.act.bind(this), _waitInterval);
     } else {
       button.innerText = 'Play';
@@ -136,7 +133,7 @@ class App extends React.Component <{}, AppState> {
                 <span className="input-group-addon">Agents</span>
                 <input ref={i => this.inputAgents = i} type="number" className="form-control" defaultValue="100" />
                 <span className="input-group-btn">
-                  <button type="button" className="btn btn-secondary" onClick={this.onRefreshClicked.bind(this)}>
+                  <button type="button" className="btn btn-secondary" onClick={_ => this.onRefreshClicked()}>
                     Refresh
                   </button>
                 </span>
@@ -157,7 +154,7 @@ class App extends React.Component <{}, AppState> {
             <div className="col-lg-2">
               <div className="input-group">
                 <span className="input-group-addon">Wait</span>
-                <input type="number" className="form-control" min="20" max="1000" step="5" defaultValue={_waitInterval + ''} onChange={this.onIntervalChanged.bind(this)} />
+                <input type="number" className="form-control" min="10" max="1000" step="5" defaultValue={_waitInterval + ''} onChange={e => this.onIntervalChanged(e)} />
               </div>
             </div>
             <div className="col-lg-2">
@@ -168,15 +165,15 @@ class App extends React.Component <{}, AppState> {
             </div>
             <div className="col-lg-1">
               <div className="btn-group" role="group" aria-label="Basic example">
-                <button ref={b => this.buttonPlay = b} type="button" className="btn btn-info" onClick={this.onStartPauseClicked.bind(this)}>
+                <button ref={b => this.buttonPlay = b} type="button" className="btn btn-info" onClick={_ => this.onStartPauseClicked()}>
                   Play
                 </button>
-                
+
               </div>
             </div>
           </div>
         </div>
-        
+
         <svg width={_width} height={_height}>{agents}</svg>
       </div>
     );
@@ -189,12 +186,15 @@ interface ReactAgentProps {
   agent: Agent;
 }
 
-class ReactAgent extends React.Component <ReactAgentProps, {}> {
+class ReactAgent extends React.Component<ReactAgentProps, {}> {
   render() {
-    var circles: Array<JSX.Element> = new Array();
-    this.props.agent.bodies.forEach(function (b: Point, i: number) {
-      circles.push(<circle key={i} className="agent" cx={b.x} cy={b.y} r={_radius} />);
-    });
+    let bodies = this.props.agent.bodies;
+    let circles: Array<JSX.Element> = new Array();
+
+    for (let i = 0; i < bodies.length; i++) {
+      let b = bodies[i];
+      circles[i] = <circle ref={e => b.elem = e} key={i} className="agent" cx={b.x} cy={b.y} r={_radius} />;
+    }
 
     return <g>{circles}</g>;
   }
@@ -229,13 +229,13 @@ class Agent {
       minxy.shift(angle);
       maxxy.shift(angle);
 
-      if (minxy.x < 0 
-        || maxxy.x > _width 
+      if (minxy.x < 0
+        || maxxy.x > _width
         || minxy.y < 0
         || maxxy.y > _height
       ) {
         angle += 0.5;
-        if (angle > 1) { angle -+ 1; }
+        if (angle > 1) { angle -= 1; }
       }
 
       for (var i = 0; i < this.bodies.length; i++) {
@@ -246,9 +246,14 @@ class Agent {
         self.maxxy.x = Math.max(self.maxxy.x, p.x);
         self.maxxy.y = Math.max(self.maxxy.y, p.y);
       }
-      
+
       this.moveWait = 0;
+
     }
+  }
+
+  isWaiting(): boolean {
+    return this.moveWait < this.bodies.length;
   }
 
   migrateTo(other: Agent) {
@@ -258,11 +263,18 @@ class Agent {
   }
 
   collides(other: Agent): boolean {
-    return this.bodies.some((a: Point) => {
-      return other.bodies.some((b: Point) => {
-        return a.distance(b) <= _radius * 2;
-      });
-    });
+    for (let i = 0; i < this.bodies.length; i++) {
+      let a = this.bodies[i];
+      for (let j = 0; j < other.bodies.length; j++) {
+        let b = other.bodies[j];
+        if (a.distance(b) <= _radius * 2) {
+          return Math.random() < _stickyness;
+          // return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   isEmpty(): boolean {
@@ -278,7 +290,7 @@ class Agent {
 
   center(): Point {
     return new Point(
-      this.maxxy.x - this.minxy.x, 
+      this.maxxy.x - this.minxy.x,
       this.maxxy.y - this.minxy.y);
   }
 
@@ -287,6 +299,7 @@ class Agent {
 class Point {
   x: number;
   y: number;
+  elem: SVGCircleElement | null;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -301,6 +314,11 @@ class Point {
     let rotation = Math.PI * 2 * angle;
     this.x += _step * Math.cos(rotation);
     this.y += _step * Math.sin(rotation);
+    
+    if (this.elem) {
+      this.elem.setAttribute('cx', this.x + '');
+      this.elem.setAttribute('cy', this.y + '');
+    }
   }
 
   distance(p: Point): number {
