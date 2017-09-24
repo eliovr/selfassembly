@@ -1,6 +1,8 @@
-A particle self assembly simulator with diffusion-limited aggregation. This project was developed in collaboration with Carlos Rodriguez-Abreu
+# A particle self assembly simulator with diffusion-limited aggregation 
 
-You can try it [here](https://eliovr.github.io/selfassembly/).
+This project was developed in collaboration with Carlos Rodriguez-Abreu.
+
+To try it visit [here](https://eliovr.github.io/selfassembly/).
 
 ## Details
 The solution was built using: 
