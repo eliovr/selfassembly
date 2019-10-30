@@ -22,5 +22,9 @@
 }
 
 .agent {
-  fill: #7FB3D5;
+  fill: rgb(225, 226, 226);
+}
+
+body{
+  background-color: black
 }

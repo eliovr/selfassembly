@@ -1,46 +1,56 @@
 import * as React from 'react';
 import './App.css';
 
-let _step = 3;
-let _radius = 7;
-let _waitInterval = 100;
-let _stickyness = 1.0;
-let _speed = 20;
-let _simulationType = 'particles';
-
-let _width = 1000;
-let _height = 600;
 let _intervalID: number;
 let _idCounter = 0;
 
 interface AppState {
   agents: Array<Agent>;
+  running: boolean;
 }
 
-class App extends React.Component<{}, AppState> {
+interface AppProps {
+  width: number;
+  height: number
+}
+
+class App extends React.Component<AppProps, AppState> {
   inputAgents: HTMLInputElement | null;
   buttonPlay: HTMLButtonElement | null;
+
+  agentsCount: number = 300;
+  step: number = 3;
+  radius: number = 6;
+  stickyness: number = 1.0;
+  speed: number = 50;
+  agentType: string = 'particle';
 
   constructor() {
     super();
 
     this.state = {
-      agents: []
+      agents: [],
+      running: false
     };
   }
 
-  initAgents(agentCount: number): Array<Agent> {
+  componentDidMount() {
+    this.setState({ agents: this.initAgents() });
+  }
+
+  initAgents(): Array<Agent> {
+    let p = this.props;
     let agents: Array<Agent> = [];
-    let diameter = (_radius * 2);
+    let diameter = (this.radius * 2);
 
-    for (let i = 0; i < agentCount; i++) {
-      let x = Math.random() * _width + diameter;
-      let y = Math.random() * _height + diameter;
+    for (let i = 0; i < this.agentsCount; i++) {
+      let x = Math.random() * p.width + diameter;
+      let y = Math.random() * p.height + diameter;
 
-      x = x > _width ? x - (diameter * 2) : x;
-      y = y > _height ? y - (diameter * 2) : y;
+      x = x > p.width ? x - (diameter * 2) : x;
+      y = y > p.height ? y - (diameter * 2) : y;
 
-      agents.push(new Agent(new Point(x, y)));
+      agents.push(new Agent(new Point(x, y, this.radius), this.agentType));
     }
 
     return agents;
@@ -49,81 +59,79 @@ class App extends React.Component<{}, AppState> {
   act() {
     let agents = this.state.agents;
     let newAgents: Array<Agent> = [];
+    let p = this.props;
 
-    for (let j = 0; j < _speed; j++) {
+    for (let k = 0; k < this.speed; k++) {
       for (let i = 0; i < agents.length; i++) {
         let a = agents[i];
   
         if (!a.isEmpty()) {
-          a.act();
-          newAgents.push(a);
+          a.act(p.width, p.height, this.step);
+          if (k === this.speed - 1) { newAgents.push(a); }
           
-          for (let j = 0; j < agents.length; j++) {
+          for (let j = i + 1; j < agents.length; j++) {
             let b = agents[j];
-            if (a.id !== b.id && a.collides(b)) {
-              if (Math.random() < _stickyness)
-                b.migrateTo(a);
-              break;
+            if (a.collides(b)) {
+              if (Math.random() < this.stickyness) { 
+                a.merge(b);
+              }
             }
           }
         }
       }
     }
+
+    this.setState({ agents: newAgents });
   }
 
   onStartPauseClicked() {
-    if (!this.buttonPlay || !this.inputAgents) { return; }
-    let button = this.buttonPlay;
-
-    if (button.innerText === 'Play') {
-      button.innerText = 'Pause';
-
-      if (this.state.agents.length <= 0) {
-        let agents = this.initAgents(+this.inputAgents.value);
-        this.setState({ agents: agents });
-      }
-
-      _intervalID = window.setInterval(this.act.bind(this), _waitInterval);
+    let running = !this.state.running;
+    if (running) {
+      _intervalID = window.setInterval(() => this.act(), 100);
     } else {
-      button.innerText = 'Play';
       window.clearInterval(_intervalID);
     }
+    this.setState({ running: running });
   }
 
   onRefreshClicked() {
-    if (!this.inputAgents || !this.buttonPlay) { return; }
-    let agents = this.initAgents(+this.inputAgents.value);
-    window.clearInterval(_intervalID);
-    this.buttonPlay.innerText = 'Play';
     this.setState({
-      agents: agents
-    });
+      agents: this.initAgents()
+    })
   }
 
   onSimulationTypeChanged(e: React.ChangeEvent<HTMLSelectElement>) {
-    _simulationType = (e.target as HTMLSelectElement).value;
+    this.agentType = (e.target as HTMLSelectElement).value;
+    this.setState({
+      agents: this.initAgents()
+    })
   }
 
   onSpeedChanged(e: React.ChangeEvent<HTMLInputElement>) {
-    _speed = +(e.target as HTMLInputElement).value;
+    this.speed = +(e.target as HTMLInputElement).value;
   }
 
   onStepChanged(e: React.ChangeEvent<HTMLInputElement>) {
-    _step = +(e.target as HTMLInputElement).value;
+    this.step = +(e.target as HTMLInputElement).value;
   }
 
   onRadiusChanged(e: React.ChangeEvent<HTMLInputElement>) {
-    _radius = +(e.target as HTMLInputElement).value;
+    this.radius = +(e.target as HTMLInputElement).value;
   }
 
   onStickynessChanged(e: React.ChangeEvent<HTMLInputElement>) {
-    _stickyness = +(e.target as HTMLInputElement).value;
+    this.stickyness = +(e.target as HTMLInputElement).value;
   }
 
   render() {
-    let agents = this.state.agents.map(function (a: Agent, i: number) {
-      return <ReactAgent key={i} agent={a} />;
-    });
+    let playButtonText = this.state.running ? 'Pause' : 'Play';
+    let agents = this.state.agents;
+    let agentElems: Array<JSX.Element> = new Array();
+
+    for (let i = 0; i < agents.length; i++) {
+      let a = agents[i];
+      agentElems[i] = a.toJSX();
+    }
 
     return (
       <div className="App">
@@ -135,48 +143,50 @@ class App extends React.Component<{}, AppState> {
                   Refresh
                 </button>
                 <button type="button" ref={b => this.buttonPlay = b} className="btn btn-info" onClick={_ => this.onStartPauseClicked()}>
-                  Play
+                  {playButtonText}
                 </button>
               </div>
 
-              {/* <select onChange={this.onSimulationTypeChanged}>
-                <option value="particles">Particles</option>
-                <option value="droplets">Droplets</option>
-              </select> */}
+              <select className="browser-default custom-select mb-3" onChange={e => this.onSimulationTypeChanged(e)}>
+                <option value="particle">Particles</option>
+                <option value="droplet">Droplets</option>
+              </select>
 
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
-                  <span className="input-group-text" id="inputGroup-sizing-sm">Agent</span>
+                  <span className="input-group-text" id="inputGroup-sizing-sm">Agents</span>
                 </div>
-                <input ref={i => this.inputAgents = i} type="number" className="form-control" defaultValue="200" />
+                <input ref={i => this.inputAgents = i} type="number" className="form-control" defaultValue={this.agentsCount + ''} />
               </div>
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
                   <span className="input-group-text" id="inputGroup-sizing-sm">Radius</span>
                 </div>
-                <input type="number" className="form-control" min="2" max="20" defaultValue={_radius + ''} onChange={this.onRadiusChanged} />
+                <input type="number" className="form-control" min="2" max="20" defaultValue={this.radius + ''} onChange={e => this.onRadiusChanged(e)} />
               </div>
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
                   <span className="input-group-text" id="inputGroup-sizing-sm">Step</span>
                 </div>
-                <input type="number" className="form-control" min="1" max="100" defaultValue={_step + ''} onChange={this.onStepChanged} />
+                <input type="number" className="form-control" min="1" max="100" defaultValue={this.step + ''} onChange={e => this.onStepChanged(e)} />
               </div>
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
                   <span className="input-group-text" id="inputGroup-sizing-sm">Speed</span>
                 </div>
-                <input type="number" className="form-control" min="1" max="100" step="1" defaultValue={_speed + ''} onChange={e => this.onSpeedChanged(e)} />
+                <input type="number" className="form-control" min="1" max="100" step="1" defaultValue={this.speed + ''} onChange={e => this.onSpeedChanged(e)} />
               </div>
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
                   <span className="input-group-text" id="inputGroup-sizing-sm">Stickyness</span>
                 </div>
-                <input type="number" className="form-control" min="0" max="1" step="0.1" defaultValue={_stickyness + ''} onChange={this.onStickynessChanged} />
+                <input type="number" className="form-control" min="0" max="1" step="0.1" defaultValue={this.stickyness + ''} onChange={e => this.onStickynessChanged(e)} />
               </div>
             </div>
 
-            <div className="col-lg-10"><svg width={_width} height={_height}>{agents}</svg></div>
+            <div className="col-lg-10">
+              <svg width={this.props.width} height={this.props.height}>{agentElems}</svg>
+            </div>
           </div>
         </div>
       </div>
@@ -186,33 +196,18 @@ class App extends React.Component<{}, AppState> {
 
 export default App;
 
-interface ReactAgentProps {
-  agent: Agent;
-}
-
-class ReactAgent extends React.Component<ReactAgentProps, {}> {
-  render() {
-    let bodies = this.props.agent.bodies;
-    let circles: Array<JSX.Element> = new Array();
-
-    for (let i = 0; i < bodies.length; i++) {
-      let b = bodies[i];
-      circles[i] = <circle ref={e => b.elem = e} key={i} className="agent" cx={b.x} cy={b.y} r={_radius} />;
-    }
-
-    return <g>{circles}</g>;
-  }
-}
-
 class Agent {
   id: number;
+  agentType: string;
+  body: Point;
   bodies: Array<Point>;
   minxy: Point;
   maxxy: Point;
   moveWait: number;
   stickWait: number;
 
-  constructor(p: Point) {
+  constructor(p: Point, typ: string) {
+    this.body = p;
     this.bodies = new Array();
     this.bodies.push(p);
     this.id = _idCounter++;
@@ -220,74 +215,104 @@ class Agent {
     this.maxxy = p.clone();
     this.moveWait = 0;
     this.stickWait = 1;
+    this.agentType = typ;
   }
 
-  act() {
-    this.moveWait++;
+  act(width: number, height: number, step: number) {
+    if (this.agentType === 'particle') {
+      this.moveWait++;
 
-    if (!this.isEmpty() && this.moveWait >= this.bodies.length) {
-      let self = this;
-      let angle = Math.random();
-      let minxy = self.minxy.clone();
-      let maxxy = self.maxxy.clone();
-      minxy.move(angle);
-      maxxy.move(angle);
+      if (!this.isEmpty() && this.moveWait >= this.bodies.length) {
+        this.moveWait = 0;
+        let self = this;
+        let angle = Math.random();
+        let minxy = self.minxy.clone();
+        let maxxy = self.maxxy.clone();
+        minxy.move(angle, step);
+        maxxy.move(angle, step);
 
-      if (minxy.x < 0
-        || maxxy.x > _width
-        || minxy.y < 0
-        || maxxy.y > _height
-      ) {
-        angle += 0.5;
-        if (angle > 1) { angle -= 1; }
+        if (minxy.x < 0
+          || maxxy.x > width
+          || minxy.y < 0
+          || maxxy.y > height
+        ) {
+          angle += 0.5;
+          if (angle > 1) { angle -= 1; }
+        }
+
+        for (var i = 0; i < this.bodies.length; i++) {
+          var p = this.bodies[i];
+          p.move(angle, step);
+          self.minxy.x = Math.min(self.minxy.x, p.x);
+          self.minxy.y = Math.min(self.minxy.y, p.y);
+          self.maxxy.x = Math.max(self.maxxy.x, p.x);
+          self.maxxy.y = Math.max(self.maxxy.y, p.y);
+        }
       }
+    } else {
+      this.moveWait += 2;
 
-      for (var i = 0; i < this.bodies.length; i++) {
-        var p = this.bodies[i];
-        p.move(angle);
-        self.minxy.x = Math.min(self.minxy.x, p.x);
-        self.minxy.y = Math.min(self.minxy.y, p.y);
-        self.maxxy.x = Math.max(self.maxxy.x, p.x);
-        self.maxxy.y = Math.max(self.maxxy.y, p.y);
+      if (!this.isEmpty() && this.moveWait >= this.body.radius) {
+        this.moveWait = 0;
+        let angle = Math.random();
+        let b = this.body;
+        b.move(angle, step);
+        if (b.x < 0 || b.x > width || b.y < 0 || b.y > height ) {
+          angle += 0.5;
+          if (angle > 1) { angle -= 1; }
+          b.move(angle, step);
+        }
       }
-
-      this.moveWait = 0;
-
-    }
+    } 
   }
 
   isWaiting(): boolean {
     return this.moveWait < this.bodies.length;
   }
 
-  migrateTo(other: Agent) {
-    while (this.bodies.length > 0) {
-      other.bodies.push(this.bodies.pop() as Point);
+  merge(other: Agent) {
+    if (this.agentType === 'particle') {
+      while (other.bodies.length > 0) {
+        this.bodies.push(other.bodies.pop() as Point);
+      }
+    }
+    else {
+      this.body.radius += other.body.radius * .5;
+      other.body.radius = 0;
     }
   }
 
   collides(other: Agent): boolean {
-    for (let i = 0; i < this.bodies.length; i++) {
-      let a = this.bodies[i];
-      for (let j = 0; j < other.bodies.length; j++) {
-        let b = other.bodies[j];
-        if (a.distance(b) <= _radius * 2) {
-          return true;
-          // return Math.random() < _stickyness;
+    if (this.agentType === 'particle') {
+      for (let i = 0; i < this.bodies.length; i++) {
+        let a = this.bodies[i];
+        for (let j = 0; j < other.bodies.length; j++) {
+          let b = other.bodies[j];
+          if (a.distance(b) <= a.radius + b.radius) {
+            return true;
+          }
         }
       }
+    } else {
+      let a = this.body;
+      let b = other.body;
+      return a.distance(b) <= a.radius + b.radius;
     }
-
     return false;
   }
 
   isEmpty(): boolean {
-    return this.bodies.length <= 0;
+    if (this.agentType === 'particle') { 
+      return this.bodies.length <= 0; 
+    }
+    else {
+      return this.body.radius === 0;
+    }
   }
 
-  isSticky(): boolean {
+  isSticky(stickyness: number): boolean {
     this.stickWait++;
-    let stick = this.stickWait >= (1 / _stickyness);
+    let stick = this.stickWait >= (1 / stickyness);
     if (stick) { this.stickWait = 0; }
     return stick;
   }
@@ -295,13 +320,23 @@ class Agent {
   center(): Point {
     return new Point(
       this.maxxy.x - this.minxy.x,
-      this.maxxy.y - this.minxy.y);
+      this.maxxy.y - this.minxy.y, 0);
   }
 
-  moveAwayFrom(a: Agent) {
-
+  toJSX(): JSX.Element {
+    if (this.agentType === 'particle') {
+      let circles: Array<JSX.Element> = new Array();
+      for (let j = 0; j < this.bodies.length; j++) {
+        let b = this.bodies[j];
+        circles[j] = <circle ref={e => b.elem = e} key={j} className="agent" cx={b.x} cy={b.y} r={b.radius} />;
+      }
+      return <g>{circles}</g>;
+    }
+    else {
+      let b = this.body;
+      return <circle ref={e => b.elem = e} key={this.id} className="agent" cx={b.x} cy={b.y} r={b.radius} />;
+    }
   }
-
 }
 
 class Point {
@@ -310,30 +345,26 @@ class Point {
   radius: number;
   elem: SVGCircleElement | null;
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number, radius: number) {
     this.x = x;
     this.y = y;
-    this.radius = _radius;
+    this.radius = radius;
   }
 
   clone(): Point {
-    return new Point(this.x, this.y);
+    return new Point(this.x, this.y, this.radius);
   }
 
-  move(angle: number) {
+  move(angle: number, step: number) {
     let rotation = Math.PI * 2 * angle;
-    let x = this.x + _step * Math.cos(rotation);
-    let y = this.y + _step * Math.sin(rotation);
-    this.moveTo(x, y)
+    let x = this.x + step * Math.cos(rotation);
+    let y = this.y + step * Math.sin(rotation);
+    this.moveTo(x, y);
   }
 
   moveTo(x: number, y: number) {
     this.x = x;
     this.y = y;
-    if (this.elem) {
-      this.elem.setAttribute('cx', x + '');
-      this.elem.setAttribute('cy', y + '');
-    }
   }
 
   distance(p: Point): number {
@@ -351,11 +382,11 @@ class Point {
   }
 
   moveAwayFrom(p: Point) {
-    let dx = p.x - this.x;
-    let dy = p.y - this.y;
-    let mag = Math.sqrt( Math.pow(dx, 2) + Math.pow(dy, 2));
-    let x = this.x - dx * _step / mag
-    let y = this.y - dy * _step / mag
-    this.moveTo(x, y)
+    // let dx = p.x - this.x;
+    // let dy = p.y - this.y;
+    // let mag = Math.sqrt( Math.pow(dx, 2) + Math.pow(dy, 2));
+    // let x = this.x - dx * _step / mag
+    // let y = this.y - dy * _step / mag
+    // this.moveTo(x, y)
   }
 }
