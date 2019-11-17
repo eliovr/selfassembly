@@ -11,16 +11,16 @@ interface AppState {
 
 interface AppProps {
   width: number;
-  height: number
+  height: number;
 }
 
 class App extends React.Component<AppProps, AppState> {
   inputAgents: HTMLInputElement | null;
   buttonPlay: HTMLButtonElement | null;
 
-  agentsCount: number = 300;
+  agentsCount: number = 400;
   step: number = 3;
-  radius: number = 6;
+  radius: number = 4;
   stickyness: number = 1.0;
   speed: number = 50;
   agentType: string = 'particle';
@@ -60,6 +60,7 @@ class App extends React.Component<AppProps, AppState> {
     let agents = this.state.agents;
     let newAgents: Array<Agent> = [];
     let p = this.props;
+    let checkCoallision = Math.random() < this.stickyness;
 
     for (let k = 0; k < this.speed; k++) {
       for (let i = 0; i < agents.length; i++) {
@@ -69,10 +70,10 @@ class App extends React.Component<AppProps, AppState> {
           a.act(p.width, p.height, this.step);
           if (k === this.speed - 1) { newAgents.push(a); }
           
-          for (let j = i + 1; j < agents.length; j++) {
-            let b = agents[j];
-            if (a.collides(b)) {
-              if (Math.random() < this.stickyness) { 
+          if (checkCoallision) {
+            for (let j = i + 1; j < agents.length; j++) {
+              let b = agents[j];
+              if (a.collides(b)) {
                 a.merge(b);
               }
             }
@@ -97,14 +98,18 @@ class App extends React.Component<AppProps, AppState> {
   onRefreshClicked() {
     this.setState({
       agents: this.initAgents()
-    })
+    });
   }
 
   onSimulationTypeChanged(e: React.ChangeEvent<HTMLSelectElement>) {
     this.agentType = (e.target as HTMLSelectElement).value;
     this.setState({
       agents: this.initAgents()
-    })
+    });
+  }
+
+  onAgentsChanged(e: React.ChangeEvent<HTMLInputElement>) {
+    this.agentsCount = +(e.target as HTMLInputElement).value;
   }
 
   onSpeedChanged(e: React.ChangeEvent<HTMLInputElement>) {
@@ -138,15 +143,6 @@ class App extends React.Component<AppProps, AppState> {
         <div className="App-header container">
           <div className="row">
             <div className="col-lg-2">
-              <div className="btn-group form-group">
-                <button type="button" className="btn btn-secondary" onClick={_ => this.onRefreshClicked()}>
-                  Refresh
-                </button>
-                <button type="button" ref={b => this.buttonPlay = b} className="btn btn-info" onClick={_ => this.onStartPauseClicked()}>
-                  {playButtonText}
-                </button>
-              </div>
-
               <select className="browser-default custom-select mb-3" onChange={e => this.onSimulationTypeChanged(e)}>
                 <option value="particle">Particles</option>
                 <option value="droplet">Droplets</option>
@@ -156,7 +152,7 @@ class App extends React.Component<AppProps, AppState> {
                 <div className="input-group-prepend">
                   <span className="input-group-text" id="inputGroup-sizing-sm">Agents</span>
                 </div>
-                <input ref={i => this.inputAgents = i} type="number" className="form-control" defaultValue={this.agentsCount + ''} />
+                <input ref={i => this.inputAgents = i} type="number" className="form-control" defaultValue={this.agentsCount + ''} onChange={e => this.onAgentsChanged(e)}/>
               </div>
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
@@ -164,6 +160,16 @@ class App extends React.Component<AppProps, AppState> {
                 </div>
                 <input type="number" className="form-control" min="2" max="20" defaultValue={this.radius + ''} onChange={e => this.onRadiusChanged(e)} />
               </div>
+
+              <div className="btn-group form-group">
+                <button type="button" className="btn btn-secondary" onClick={_ => this.onRefreshClicked()}>
+                  Refresh
+                </button>
+                <button type="button" ref={b => this.buttonPlay = b} className="btn btn-info" onClick={_ => this.onStartPauseClicked()}>
+                  {playButtonText}
+                </button>
+              </div>
+              
               <div className="input-group input-group-sm mb-3">
                 <div className="input-group-prepend">
                   <span className="input-group-text" id="inputGroup-sizing-sm">Step</span>
@@ -275,8 +281,7 @@ class Agent {
       while (other.bodies.length > 0) {
         this.bodies.push(other.bodies.pop() as Point);
       }
-    }
-    else {
+    } else {
       this.body.radius += other.body.radius * .5;
       other.body.radius = 0;
     }
@@ -304,8 +309,7 @@ class Agent {
   isEmpty(): boolean {
     if (this.agentType === 'particle') { 
       return this.bodies.length <= 0; 
-    }
-    else {
+    } else {
       return this.body.radius === 0;
     }
   }
@@ -331,8 +335,7 @@ class Agent {
         circles[j] = <circle ref={e => b.elem = e} key={j} className="agent" cx={b.x} cy={b.y} r={b.radius} />;
       }
       return <g>{circles}</g>;
-    }
-    else {
+    } else {
       let b = this.body;
       return <circle ref={e => b.elem = e} key={this.id} className="agent" cx={b.x} cy={b.y} r={b.radius} />;
     }
